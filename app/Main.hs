@@ -1,6 +1,8 @@
 module Main where
 
-import Lib
+import Brainfuck
+
+-- TODO: Write repl & interpreter
 
 main :: IO ()
-main = someFunc
+main = putStrLn "Not yet implemented"
