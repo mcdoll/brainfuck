@@ -11,6 +11,8 @@ import qualified Data.Map as Map
 import Control.Monad
 import Control.Monad.IO.Class
 import Control.Monad.Trans.State
+import Text.Parsec hiding (parse)
+import Text.Parsec.Char
 
 -- Definitions for the 'Turing machine'
 
@@ -31,8 +33,7 @@ setValue v (TuringMachine b p) = TuringMachine (Map.insert p v b) p
 
 modifyValue f = Map.alter (Just . f . (maybe 0 id))
 
--- Parse BF code
--- TODO: Use parsec or similar to simplify the code
+-- Parse BF code using parsec
 
 parseChar :: Char -> Command
 parseChar '+' = Increment
@@ -42,31 +43,12 @@ parseChar '<' = MoveRight
 parseChar '.' = Out
 parseChar ',' = In
 
+parsePrimitives = parseChar <$> satisfy (\x -> elem x ".,+-><")
+parseBrackets = between (char '[') (char ']')
+parseBF = many (parsePrimitives <|> (While <$> parseBrackets parseBF))
+parse fname = runParserT parseBF () fname . reduce
+
 reduce = filter (\x -> elem x ".,+-><[]")
-
-parseTopLevel :: String -> Maybe [Command]
-parseTopLevel [] = Just []
-parseTopLevel (']' : xs) = Nothing
-parseTopLevel ('[' : xs) = do
-    (com, str) <- parseParens xs
-    com' <- parseTopLevel str
-    return (While com : com')
-parseTopLevel (x:xs) = do
-    com <- parseTopLevel xs
-    return (parseChar x : com)
-
-parseParens :: String -> Maybe ([Command], String)
-parseParens [] = Nothing
-parseParens (']' : xs) = Just ([], xs)
-parseParens ('[' : xs) = do
-    (com, str) <- parseParens xs
-    (com', str') <- parseParens str
-    return (While com : com', str')
-parseParens (x:xs) = do
-    (com, str) <- parseParens xs
-    return (parseChar x : com, str)
-
-parse = parseTopLevel . reduce
 
 -- do IO stuff
 
@@ -94,4 +76,4 @@ evalCmd (While commands) = while (liftM ((/=0) . getValue) get) (mapM evalCmd co
 -- enduser functions
 
 eval initialState prog = evalStateT (mapM_ evalCmd prog) initialState
-run = (maybe (print "CompileError: Could not parse file") (eval newTM)) . parse
+run fname input = parse fname input >>= either print (eval newTM)
