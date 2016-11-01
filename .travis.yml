@@ -1,0 +1,4 @@
+sudo: false
+language: sh
+install:
+- stack build --no-terminal --skip-ghc-check
